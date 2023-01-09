@@ -1,25 +1,31 @@
-name: deploy to lambda
+name: Deploy
+
 on:
-  # Trigger the workflow on push or pull request,
-  # but only for the main branch
   push:
     branches:
-      - main
+    - master
+
 jobs:
-
-
-  deploy_source:
-    name: deploy lambda from source
+  deploy_lambda:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout source code
-        uses: actions/checkout@v1
-      - name: default deploy
-        uses: appleboy/lambda-action@master
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
         with:
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_region: ${{ secrets.AWS_REGION }}
-          function_name: pdftoemail 
-          zip_file: function.zip
-          dry_run: true
+          node-version: '18'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: npm install
+        env:
+          CI: true
+        run: |
+          npm ci
+      - name: deploy
+        run: |
+          npx ncc build index.js
+          zip -j deploy.zip ./dist/*
+          aws lambda update-function-code --function-name=lambda-gh-action --zip-file=fileb://deploy.zip
